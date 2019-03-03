@@ -6,6 +6,9 @@
 #define KEY_MAX_LENGTH 10
 uint16_t key[KEY_MAX_LENGTH];
 
+#define EVENT_QUEUE_SIZE 20
+Event eventQueue[EVENT_QUEUE_SIZE];
+
 void setupTests()
 {
     randomSeed(analogRead(0));
@@ -16,13 +19,13 @@ void setupTests()
 }
 void test_locked_by_default()
 {
-    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, NULL);
     TEST_ASSERT_FALSE(cl.unlocked);
 }
 
 void test_valid_steps_progress_key()
 {
-    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, NULL);
     for (uint8_t step = 0; step < KEY_MAX_LENGTH; step++)
     {
         uint16_t validStep = key[step];
@@ -33,7 +36,7 @@ void test_valid_steps_progress_key()
 
 void test_invalid_step_resets_key()
 {
-    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, NULL);
     uint8_t stepToChooseInvalidValue = random(KEY_MAX_LENGTH);
 
     // choose valid values until an invalid value will be tests
@@ -51,7 +54,7 @@ void test_invalid_step_resets_key()
 
 void test_all_valid_steps_unlock_key()
 {
-    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, NULL);
     // try valid values for all but the last step
     for (uint8_t step = 0; step < KEY_MAX_LENGTH - 1; step++)
     {
@@ -65,7 +68,7 @@ void test_all_valid_steps_unlock_key()
 
 void test_trying_after_unlock_does_nothing()
 {
-    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, NULL);
     // enter values to unlock
     for (uint8_t step = 0; step < KEY_MAX_LENGTH; step++)
     {
@@ -81,7 +84,7 @@ void test_trying_after_unlock_does_nothing()
 
 void test_force_unlock()
 {
-    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, NULL);
     cl.unlock();
 
     TEST_ASSERT_TRUE(cl.unlocked);
@@ -90,7 +93,7 @@ void test_force_unlock()
 
 void test_force_lock()
 {
-    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, NULL);
     // enter values to unlock
     for (uint8_t step = 0; step < KEY_MAX_LENGTH; step++)
     {
@@ -101,6 +104,35 @@ void test_force_lock()
     TEST_ASSERT_FALSE(cl.unlocked);
     TEST_ASSERT_EQUAL(0, cl.keyPosition);
 }
+
+void test_valid_step_progress_event()
+{
+    uint8_t teamID = randomBits(QE_TEAM_ID_BITS);
+    uint8_t playerID = randomBits(QE_PLAYER_ID_BITS);
+
+    Quest_EventQueue eq = Quest_EventQueue(eventQueue, EVENT_QUEUE_SIZE, teamID, playerID);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, &eq);
+
+    for (uint8_t i = 0; i < KEY_MAX_LENGTH; i++)
+    {
+        cl.tryStep(key[i]);
+    }
+
+    Event next;
+    for (uint8_t i = 0; i < KEY_MAX_LENGTH; i++)
+    {
+        TEST_ASSERT_TRUE(eq.poll(&next));
+        TEST_ASSERT_EQUAL(teamID, next.teamID);
+        TEST_ASSERT_EQUAL(playerID, next.playerID);
+        TEST_ASSERT_EQUAL(QE_ID_PROGRESS, next.eventID);
+        TEST_ASSERT_EQUAL(16, next.dataLengthInBits);
+        TEST_ASSERT_EQUAL(i + 1, next.data[0]);
+        TEST_ASSERT_EQUAL(KEY_MAX_LENGTH, next.data[1]);
+    }
+}
+
+// test unlocked event
+// test locked event
 
 void setup()
 {
@@ -116,6 +148,7 @@ void setup()
     RUN_TEST(test_trying_after_unlock_does_nothing);
     RUN_TEST(test_force_unlock);
     RUN_TEST(test_force_lock);
+    RUN_TEST(test_valid_step_progress_event);
 
     UNITY_END();
 }
