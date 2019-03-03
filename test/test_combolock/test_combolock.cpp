@@ -9,6 +9,9 @@ uint16_t key[KEY_MAX_LENGTH];
 #define EVENT_QUEUE_SIZE 20
 Event eventQueue[EVENT_QUEUE_SIZE];
 
+uint8_t teamID = randomBits(QE_TEAM_ID_BITS);
+uint8_t playerID = randomBits(QE_PLAYER_ID_BITS);
+
 void setupTests()
 {
     randomSeed(analogRead(0));
@@ -131,7 +134,52 @@ void test_valid_step_progress_event()
     }
 }
 
+void test_invalid_step_progress_event()
+{
+    Quest_EventQueue eq = Quest_EventQueue(eventQueue, EVENT_QUEUE_SIZE, teamID, playerID);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, &eq);
+
+    uint16_t invalidStep = !(key[0]);
+    TEST_ASSERT_FALSE(cl.tryStep(invalidStep));
+
+    Event next;
+    TEST_ASSERT_TRUE(eq.poll(&next));
+    TEST_ASSERT_EQUAL(teamID, next.teamID);
+    TEST_ASSERT_EQUAL(playerID, next.playerID);
+    TEST_ASSERT_EQUAL(QE_ID_PROGRESS, next.eventID);
+    TEST_ASSERT_EQUAL(16, next.dataLengthInBits);
+    TEST_ASSERT_EQUAL(0, next.data[0]);
+    TEST_ASSERT_EQUAL(KEY_MAX_LENGTH, next.data[1]);
+}
+
+void test_unlock_event()
+{
+    Quest_EventQueue eq = Quest_EventQueue(eventQueue, EVENT_QUEUE_SIZE, teamID, playerID);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, &eq);
+
+    // enter values to unlock
+    for (uint8_t step = 0; step < KEY_MAX_LENGTH; step++)
+    {
+        cl.tryStep(key[step]);
+    }
+
+    // ignore the progress events
+    Event next;
+    for (uint8_t step = 0; step < KEY_MAX_LENGTH; step++)
+    {
+        TEST_ASSERT_TRUE(eq.poll(&next));
+        TEST_ASSERT_EQUAL(QE_ID_PROGRESS, next.eventID);
+    }
+
+    TEST_ASSERT_TRUE(eq.poll(&next));
+    TEST_ASSERT_EQUAL(teamID, next.teamID);
+    TEST_ASSERT_EQUAL(playerID, next.playerID);
+    TEST_ASSERT_EQUAL(QE_ID_UNLOCKED, next.eventID);
+    TEST_ASSERT_EQUAL(0, next.dataLengthInBits);
+}
+
 // test unlocked event
+// test force unlock event
 // test locked event
 
 void setup()
@@ -149,6 +197,8 @@ void setup()
     RUN_TEST(test_force_unlock);
     RUN_TEST(test_force_lock);
     RUN_TEST(test_valid_step_progress_event);
+    RUN_TEST(test_invalid_step_progress_event);
+    RUN_TEST(test_unlock_event);
 
     UNITY_END();
 }
