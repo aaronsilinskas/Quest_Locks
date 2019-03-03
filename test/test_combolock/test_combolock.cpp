@@ -178,8 +178,21 @@ void test_unlock_event()
     TEST_ASSERT_EQUAL(0, next.dataLengthInBits);
 }
 
-// test unlocked event
-// test force unlock event
+void test_force_unlock_event()
+{
+    Quest_EventQueue eq = Quest_EventQueue(eventQueue, EVENT_QUEUE_SIZE, teamID, playerID);
+    Quest_ComboLock cl = Quest_ComboLock(key, KEY_MAX_LENGTH, &eq);
+
+    cl.unlock();
+
+    Event next;
+    TEST_ASSERT_TRUE(eq.poll(&next));
+    TEST_ASSERT_EQUAL(teamID, next.teamID);
+    TEST_ASSERT_EQUAL(playerID, next.playerID);
+    TEST_ASSERT_EQUAL(QE_ID_UNLOCKED, next.eventID);
+    TEST_ASSERT_EQUAL(0, next.dataLengthInBits);
+}
+
 // test locked event
 
 void setup()
@@ -199,6 +212,7 @@ void setup()
     RUN_TEST(test_valid_step_progress_event);
     RUN_TEST(test_invalid_step_progress_event);
     RUN_TEST(test_unlock_event);
+    RUN_TEST(test_force_unlock_event);
 
     UNITY_END();
 }

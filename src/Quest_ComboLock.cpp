@@ -34,12 +34,7 @@ bool Quest_ComboLock::tryStep(uint16_t value)
 
     if (keyPosition == keyLength)
     {
-        unlocked = true;
-
-        if (eventQueue != NULL)
-        {
-            eventQueue->offer(QE_ID_UNLOCKED);
-        }
+        unlock();
     }
 
     return keyPosition != 0;
@@ -49,6 +44,11 @@ void Quest_ComboLock::unlock()
 {
     unlocked = true;
     keyPosition = keyLength;
+
+    if (eventQueue != NULL)
+    {
+        eventQueue->offer(QE_ID_UNLOCKED);
+    }
 }
 
 void Quest_ComboLock::lock()
