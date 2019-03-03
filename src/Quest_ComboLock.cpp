@@ -55,4 +55,9 @@ void Quest_ComboLock::lock()
 {
     unlocked = false;
     keyPosition = 0;
+
+    if (eventQueue != NULL)
+    {
+        eventQueue->offer(QE_ID_LOCKED);
+    }
 }
